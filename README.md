@@ -55,6 +55,10 @@ LIVE_TESTS=1 ./gradlew testDebugUnitTest --tests "*LiveSmokeTest" -i   # hits th
   because ESPN cannot list them).
 - `data/Repository.kt` routes each league to the right source and builds the combined feed.
 
+## Roadmap
+
+Planned work and known limits are in [ROADMAP.md](ROADMAP.md).
+
 ## Notes
 
 - ESPN's API is public but unofficial; it can change or block without notice.
