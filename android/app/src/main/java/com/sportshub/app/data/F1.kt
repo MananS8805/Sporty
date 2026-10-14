@@ -59,6 +59,23 @@ class F1Provider(private val gate: HttpGate, private val cache: TtlCache) {
             Team(id = id, name = it.str("name") ?: id, leagueId = F1_LEAGUE.id, color = COLORS[id])
         }
 
+    /** The constructor's current drivers with their championship points (Jolpica has no per-constructor driver endpoint). */
+    suspend fun drivers(teamId: String): List<Player> =
+        get("current/driverStandings", 10 * MINUTE).o("StandingsTable").a("StandingsLists").objects().firstOrNull()
+            .a("DriverStandings").objects()
+            .filter { row -> row.a("Constructors").objects().any { it.str("constructorId") == teamId } }
+            .mapNotNull {
+                val d = it.o("Driver")
+                Player(
+                    id = d.str("driverId") ?: return@mapNotNull null,
+                    name = "${d.str("givenName")} ${d.str("familyName")}",
+                    position = "Driver",
+                    jersey = d.str("permanentNumber"),
+                    country = d.str("nationality"),
+                    detail = "P${it.str("position")} · ${it.str("points")} pts",
+                )
+            }
+
     suspend fun standings(): List<StandingGroup> {
         val cons = get("current/constructorStandings", 10 * MINUTE)
         val drivers = get("current/driverStandings", 10 * MINUTE)

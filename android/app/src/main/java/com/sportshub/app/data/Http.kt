@@ -33,7 +33,7 @@ class HttpGate(
         .build(),
     private val now: () -> Long = System::currentTimeMillis,
 ) {
-    private val hostLimits = mapOf("sports.core.api.espn.com" to 4, "site.api.espn.com" to 4, "api.jolpi.ca" to 3)
+    private val hostLimits = mapOf("sports.core.api.espn.com" to 4, "site.api.espn.com" to 4, "api.jolpi.ca" to 3, "site.web.api.espn.com" to 4)
     private val semaphores = ConcurrentHashMap<String, Semaphore>()
     private val gapLocks = ConcurrentHashMap<String, Mutex>()
     private val lastCall = ConcurrentHashMap<String, Long>()

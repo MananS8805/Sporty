@@ -111,6 +111,42 @@ object EspnParse {
         "matchPoints" to "points", "noresult" to "ties",
     )
 
+    private fun player(a: JsonObject, captain: Boolean = false, keeper: Boolean = false): Player? {
+        val name = a.str("displayName") ?: a.str("fullName") ?: a.str("name") ?: return null
+        val pos = a.o("position")
+        return Player(
+            id = a.str("id") ?: name,
+            name = name,
+            position = pos.str("displayName") ?: pos.str("name") ?: pos.str("abbreviation"),
+            jersey = a.str("jersey"),
+            age = a.dbl("age")?.toInt(),
+            country = a.str("citizenship"),
+            headshot = a.o("headshot").str("href"),
+            captain = captain || a.str("captain") == "true",
+            keeper = keeper || a.str("keeper") == "true",
+        )
+    }
+
+    /** Football-style roster: a flat athletes list (US sports nest them in position groups under `items`). */
+    fun parseRoster(data: JsonObject): List<Player> =
+        data.a("athletes").objects().flatMap { g -> if (g.a("items").isNotEmpty()) g.a("items").objects() else listOf(g) }
+            .mapNotNull { player(it) }
+
+    /** Cricket squad from a match summary: the full `squads` list if present, otherwise the playing XI. */
+    fun parseCricketSquad(summary: JsonObject, teamId: String): Squad? {
+        summary.a("squads").objects().firstOrNull { it.o("team").str("id") == teamId }?.let { sq ->
+            val players = sq.a("athletes").objects().mapNotNull { player(it) }
+            if (players.isNotEmpty()) return Squad(players)
+        }
+        summary.a("rosters").objects().firstOrNull { it.o("team").str("id") == teamId }?.let { r ->
+            val players = r.a("roster").objects().mapNotNull { e ->
+                e.o("athlete")?.let { player(it, captain = e.str("captain") == "true", keeper = e.str("keeper") == "true") }
+            }
+            if (players.isNotEmpty()) return Squad(players, "Playing XI from the latest match. The full squad list isn't published for this competition.")
+        }
+        return null
+    }
+
     fun parseNews(data: JsonObject, leagueId: String): List<NewsItem> = data.a("articles").objects().map { a ->
         NewsItem(
             id = a.str("id") ?: a.str("dataSourceIdentifier") ?: a.str("headline") ?: "",
@@ -157,15 +193,10 @@ class EspnProvider(private val gate: HttpGate, private val cache: TtlCache) {
         }
     }
 
-    suspend fun scoreboard(league: League, daysBack: Long = 0, daysAhead: Long = 7): List<Fixture> {
-        val today = LocalDate.now(ZoneOffset.UTC)
-        val range = "${today.minusDays(daysBack).format(DATES)}-${today.plusDays(daysAhead).format(DATES)}"
-        return cache.getOrSet("sb:${league.id}:$range", MINUTE) {
-            val data = gate.getJson(
-                "$SITE/${league.sport}/${league.slug}/scoreboard", mapOf("dates" to range, "limit" to "300"),
-            ).asObj()
-            data.a("events").objects().mapNotNull { EspnParse.parseEvent(it, league) }.sortedBy { it.date }
-        }
+    /** Today's slate. ESPN rejects date ranges for soccer (HTTP 400), so there is no window parameter. */
+    suspend fun scoreboard(league: League): List<Fixture> = cache.getOrSet("sb:${league.id}", MINUTE) {
+        val data = gate.getJson("$SITE/${league.sport}/${league.slug}/scoreboard", mapOf("limit" to "300")).asObj()
+        data.a("events").objects().mapNotNull { EspnParse.parseEvent(it, league) }.sortedBy { it.date }
     }
 
     /** ESPN returns only played games by default; fixture=true returns the upcoming ones. */
@@ -190,4 +221,29 @@ class EspnProvider(private val gate: HttpGate, private val cache: TtlCache) {
             val params = buildMap { put("limit", "$limit"); teamId?.let { put("team", it) } }
             EspnParse.parseNews(gate.getJson("$SITE/${league.sport}/${league.slug}/news", params).asObj(), league.id)
         }
+
+    suspend fun summary(league: League, eventId: String): JsonObject = cache.getOrSet("sum:${league.id}:$eventId", 10 * MINUTE) {
+        gate.getJson("$SITE/${league.sport}/${league.slug}/summary", mapOf("event" to eventId)).asObj()
+    }
+
+    suspend fun roster(league: League, teamId: String): List<Player> = cache.getOrSet("roster:${league.id}:$teamId", 6 * 60 * MINUTE) {
+        EspnParse.parseRoster(gate.getJson("$SITE/${league.sport}/${league.slug}/teams/$teamId/roster").asObj())
+    }
+
+    /** Cricket scoreboards return a whole season when given `dates=<year>` (ranges are rejected). */
+    suspend fun seasonEvents(league: League, year: Int): List<Fixture> = cache.getOrSet("season:${league.id}:$year", 15 * MINUTE) {
+        gate.getJson("$SITE/${league.sport}/${league.slug}/scoreboard", mapOf("dates" to "$year")).asObj()
+            .a("events").objects().mapNotNull { EspnParse.parseEvent(it, league) }.sortedBy { it.date }
+    }
+
+    /** Active cricket series on a date, found through ESPN's scoreboard header feed (used for international tours). */
+    suspend fun cricketSeries(date: LocalDate): List<CricketSeries> = cache.getOrSet("series:$date", 3 * 60 * MINUTE) {
+        val params = mapOf("sport" to "cricket", "region" to "in", "lang" to "en", "dates" to date.format(DATES))
+        gate.getJson("https://site.web.api.espn.com/apis/personalized/v2/scoreboard/header", params).asObj()
+            .a("sports").objects().firstOrNull().a("leagues").objects().mapNotNull { l ->
+                CricketSeries(l.str("id") ?: return@mapNotNull null, l.str("name") ?: "", l.a("events").objects().mapNotNull { it.str("name") })
+            }
+    }
 }
+
+data class CricketSeries(val id: String, val name: String, val eventNames: List<String>)
