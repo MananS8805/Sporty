@@ -11,6 +11,23 @@ android/   The app (Kotlin + Jetpack Compose)
 ml/        The original F1 race-prediction work (notebook, training script, dataset)
 ```
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/01-home.png" width="240"><br><sub>Home: story circles, hero card, timeline</sub></td>
+    <td align="center"><img src="docs/screenshots/02-home-timeline.png" width="240"><br><sub>Timeline with where-to-watch chips</sub></td>
+    <td align="center"><img src="docs/screenshots/03-team-page.png" width="240"><br><sub>Team page: parallax hero and bento tiles</sub></td>
+    <td align="center"><img src="docs/screenshots/04-team-tiles.png" width="240"><br><sub>Squad, where to watch and fixtures</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/05-squad.png" width="240"><br><sub>Squad grouped by position</sub></td>
+    <td align="center"><img src="docs/screenshots/06-match-forecast.png" width="240"><br><sub>Match sheet: forecast inputs and broadcasters</sub></td>
+    <td align="center"><img src="docs/screenshots/07-settings.png" width="240"><br><sub>Notification and region settings</sub></td>
+    <td align="center"><img src="docs/screenshots/08-leagues.png" width="240"><br><sub>About 290 competitions to follow</sub></td>
+  </tr>
+</table>
+
 ## Coverage
 
 About 290 competitions: 219 soccer leagues worldwide, 7 cricket (IPL, Big Bash, ...),
