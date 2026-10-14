@@ -24,9 +24,12 @@ sealed interface Load<out T> {
 }
 
 private fun Throwable.friendly(): String = when (this) {
-    is java.net.ConnectException, is java.net.UnknownHostException, is java.net.SocketTimeoutException ->
-        "Can't reach the server. Is the backend running (and `adb reverse tcp:8000 tcp:8000` done)?"
-    is retrofit2.HttpException -> "Server error (${code()})."
+    is com.sportshub.app.data.UpstreamBlocked ->
+        "The data provider is limiting requests right now. Try again in a few minutes."
+    is java.net.UnknownHostException, is java.net.ConnectException, is java.net.SocketTimeoutException ->
+        "Can't reach the internet. Check your connection and retry."
+    is com.sportshub.app.data.HttpStatusException -> "The data provider returned an error ($code)."
+    is com.sportshub.app.data.NotFoundException -> message ?: "Not found."
     else -> message ?: "Something went wrong."
 }
 

@@ -3,46 +3,29 @@
 One Android app to follow all your favourite teams across leagues: fixtures, live scores,
 league tables and news for, say, Manchester United, Ferrari and an IPL team in a single feed.
 
+The app is self-contained. It talks to the public sports APIs directly from the phone, and your
+followed teams are stored on the device, so there is no server and no account.
+
 ```
-backend/   FastAPI service. Normalises ESPN, Jolpica (F1) and TheSportsDB into one schema.
-android/   Kotlin + Jetpack Compose app. Follows are stored on the device (no account).
-ml/        The original F1 race-prediction work (notebook, training script, dataset).
-legacy/    The old Streamlit app. Kept until the predictor is ported into the new app.
+android/   The app (Kotlin + Jetpack Compose)
+ml/        The original F1 race-prediction work (notebook, training script, dataset)
 ```
 
 ## Coverage
 
 About 290 competitions: 219 soccer leagues worldwide, 7 cricket (IPL, Big Bash, ...),
-38 US sports leagues, 25 rugby, and Formula 1. Cricket leagues are a hand-kept list in
-`backend/app/providers/espn.py` (`CRICKET_LEAGUES`) because ESPN cannot enumerate them.
+38 US sports leagues, 25 rugby, and Formula 1.
 
-## Run it
+| Data | Source |
+|---|---|
+| Soccer, cricket tables, news, US sports | ESPN public API (unofficial) |
+| Formula 1 | Jolpica-F1 (Ergast successor) |
+| IPL fixtures and results | TheSportsDB (free key) |
 
-### 1. Backend (needs Python 3.11+)
-
-```bash
-cd backend
-python -m venv .venv
-.venv/Scripts/python -m pip install -r requirements.txt   # Windows; use .venv/bin/python elsewhere
-.venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
-.venv/Scripts/python -m pytest                             # tests (offline)
-```
-
-The first `/leagues` call takes ~20 s while it discovers leagues; the result is cached in
-`backend/.cache/` for a week. Interactive docs: http://127.0.0.1:8000/docs
-
-### 2. Android app on a USB-connected phone
+## Install on a USB-connected phone
 
 1. On the phone, enable Developer options and USB debugging, connect it, and accept the prompt.
-2. Let the phone reach the backend on your PC through the cable:
-
-   ```bash
-   adb reverse tcp:8000 tcp:8000
-   ```
-
-   Repeat after every reconnect. The app's default `apiBaseUrl` is `http://127.0.0.1:8000/`
-   (see `android/gradle.properties`).
-3. Install and launch:
+2. Install and launch:
 
    ```bash
    cd android
@@ -54,10 +37,26 @@ The first `/leagues` call takes ~20 s while it discovers leagues; the result is 
 `android/local.properties` (the SDK path) is machine-specific and git-ignored; Android Studio
 creates it for you.
 
+## Tests
+
+```bash
+cd android
+./gradlew testDebugUnitTest                     # offline unit tests
+LIVE_TESTS=1 ./gradlew testDebugUnitTest --tests "*LiveSmokeTest" -i   # hits the real APIs (~12 requests)
+```
+
+## How it works
+
+- `data/Http.kt` is the only door to the network. Free APIs rate-limit by IP, so each host gets a
+  concurrency cap, a gap between calls, and a 5-minute back-off after a 403/429.
+- `data/Cache.kt` caches responses in memory and serves stale data if a refresh fails.
+- The list of leagues ships inside the app (`app/src/main/assets/leagues.json`), so there is no
+  discovery traffic at startup. To add a league, add it to that file (cricket ids are hand-picked
+  because ESPN cannot list them).
+- `data/Repository.kt` routes each league to the right source and builds the combined feed.
+
 ## Notes
 
-- ESPN's API is public but unofficial and rate-limits by IP. The backend throttles itself, caches
-  responses, serves stale data on failures and backs off for 5 minutes after a 403/429.
-  Don't loop over hundreds of leagues in a script.
-- Debug builds allow plain HTTP to the local backend. A release build needs the backend deployed
-  behind HTTPS and `apiBaseUrl` pointed at it.
+- ESPN's API is public but unofficial; it can change or block without notice.
+- `ml/models/` (3.4 GB of trained models) is git-ignored and not used by the app yet. A
+  phone-sized predictor would need a much smaller model.
