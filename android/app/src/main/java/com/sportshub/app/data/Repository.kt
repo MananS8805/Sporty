@@ -63,6 +63,13 @@ private suspend fun <T> attempt(block: suspend () -> T): Result<T> = try {
 
 // F1 news comes from ESPN's racing section.
 private val F1_NEWS = League(id = "racing:f1", sport = "racing", slug = "f1", name = "Formula 1")
+// Pinned first in the league list so the big competitions are not buried under e.g. AFC qualifiers.
+private val POPULAR = listOf(
+    "soccer:eng.1", "cricket:8048", "f1:f1", "soccer:esp.1", "soccer:ita.1", "soccer:ger.1", "soccer:fra.1",
+    "soccer:uefa.champions", "soccer:uefa.europa", "soccer:eng.2", "soccer:usa.1", "soccer:ned.1", "soccer:por.1",
+    "soccer:sco.1", "soccer:bra.1", "soccer:arg.1", "soccer:mex.1", "soccer:tur.1", "cricket:8044",
+    "basketball:nba", "football:nfl", "baseball:mlb", "hockey:nhl",
+)
 private val SPORT_ORDER = listOf("f1", "soccer", "cricket", "basketball", "football", "baseball", "hockey", "rugby")
 
 /** Everything the UI needs. Routes each league to the right data source, all from the phone. */
@@ -76,7 +83,13 @@ class Repository(private val context: Context, val follows: FollowStore, gate: H
     private val leagueList: List<League> by lazy {
         val bundled = context.assets.open("leagues.json").bufferedReader().use { it.readText() }
         (listOf(F1_LEAGUE) + Json { ignoreUnknownKeys = true }.decodeFromString<List<League>>(bundled))
-            .sortedWith(compareBy({ SPORT_ORDER.indexOf(it.sport).let { i -> if (i < 0) 99 else i } }, { it.name }))
+            .sortedWith(
+                compareBy(
+                    { POPULAR.indexOf(it.id).let { i -> if (i < 0) 999 else i } },
+                    { SPORT_ORDER.indexOf(it.sport).let { i -> if (i < 0) 99 else i } },
+                    { it.name },
+                ),
+            )
     }
 
     suspend fun leagues(): List<League> = withContext(Dispatchers.IO) { leagueList }

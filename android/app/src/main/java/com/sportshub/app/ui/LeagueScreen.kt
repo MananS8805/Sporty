@@ -86,19 +86,19 @@ private fun StandingsTab(leagueId: String, onOpenTeam: (String) -> Unit) {
     }
 }
 
-private class Col(val label: String, val value: (StandingRow) -> String?)
+private class Col(val label: String, val width: Int = 28, val value: (StandingRow) -> String?)
 
 private fun num(d: Double?): String? = d?.let { if (it % 1.0 == 0.0) it.toInt().toString() else "%.2f".format(it) }
 
-private fun columnsFor(rows: List<StandingRow>): List<Col> {
+private fun columnsFor(rows: List<StandingRow>, cricket: Boolean): List<Col> {
     val all = listOf(
         Col("P") { it.played?.toString() },
         Col("W") { it.wins?.toString() },
-        Col("D") { it.draws?.toString() },
+        Col(if (cricket) "NR" else "D") { it.draws?.toString() },
         Col("L") { it.losses?.toString() },
-        Col("GD") { r -> r.goalDiff?.let { (if (it > 0) "+" else "") + num(it) } },
-        Col("NRR") { r -> r.extra["netRunRate"]?.let { "%.2f".format(it) } },
-        Col("Pts") { num(it.points) },
+        Col("GD", 36) { r -> r.goalDiff?.let { (if (it > 0) "+" else "") + num(it) } },
+        Col("NRR", 44) { r -> r.extra["netRunRate"]?.let { "%.2f".format(it) } },
+        Col("Pts", 34) { num(it.points) },
     )
     return all.filter { col -> rows.any { col.value(it) != null } }
 }
@@ -112,16 +112,16 @@ private fun StandingsTable(
 ) {
     LazyColumn(Modifier.fillMaxSize()) {
         groups.forEach { group ->
-            val cols = columnsFor(group.rows)
+            val cols = columnsFor(group.rows, leagueId.startsWith("cricket:"))
             // F1's driver table has driver ids, which have no team page.
             val clickable = !(leagueId == "f1:f1" && group.name == "Drivers")
             item(key = "h-${group.name}") {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(group.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     cols.forEach {
                         Text(
                             it.label, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.End,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(34.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(it.width.dp),
                         )
                     }
                 }
@@ -132,10 +132,10 @@ private fun StandingsTable(
                     Modifier.fillMaxWidth()
                         .background(if (followed) MaterialTheme.colorScheme.primaryContainer else androidx.compose.ui.graphics.Color.Transparent)
                         .clickable(enabled = clickable) { onOpenTeam(row.team.id) }
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("${row.rank}", modifier = Modifier.width(24.dp), style = MaterialTheme.typography.bodyMedium)
+                    Text("${row.rank}", modifier = Modifier.width(22.dp), style = MaterialTheme.typography.bodyMedium)
                     if (clickable) Logo(row.team.logo, row.team.name, 24.dp, Modifier.padding(end = 8.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
@@ -151,7 +151,7 @@ private fun StandingsTable(
                         val bold = it.label == "Pts"
                         Text(
                             it.value(row) ?: "-", style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.End,
-                            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(34.dp),
+                            fontWeight = if (bold) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.width(it.width.dp), maxLines = 1,
                         )
                     }
                 }
