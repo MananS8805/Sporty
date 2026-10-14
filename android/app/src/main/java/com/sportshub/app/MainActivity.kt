@@ -120,7 +120,9 @@ private fun AppRoot(pendingTeam: Pair<String, String>?, onPendingConsumed: () ->
         }
     }
 
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    // A Surface (not a bare Box) so Text and Icon default to a readable colour on the dark background.
+    Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground) {
+      Box(Modifier.fillMaxSize()) {
         SharedTransitionLayout {
             val sharedScope = this
             NavHost(
@@ -188,6 +190,7 @@ private fun AppRoot(pendingTeam: Pair<String, String>?, onPendingConsumed: () ->
         }
 
         sheet?.let { MatchSheet(it) { sheet = null } }
+      }
     }
 }
 

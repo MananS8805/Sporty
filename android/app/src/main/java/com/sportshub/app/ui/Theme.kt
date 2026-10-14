@@ -16,6 +16,7 @@ import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -94,11 +95,23 @@ fun SportsTheme(content: @Composable () -> Unit) {
 /** Readable text colour for a given background. */
 fun onColor(background: Color): Color = if (background.luminance() > 0.45f) Color(0xFF10131A) else Color.White
 
+/** Nudges a team colour so it stays readable as text or an accent: lighter on dark surfaces, darker on light ones. */
+@Composable
+fun legibleAccent(color: Color): Color {
+    val dark = isSystemInDarkTheme()
+    val l = color.luminance()
+    return when {
+        dark && l < 0.28f -> lerp(color, Color.White, 0.42f)
+        !dark && l > 0.6f -> lerp(color, Color.Black, 0.42f)
+        else -> color
+    }
+}
+
 /** Re-themes a subtree in a team's colours (Ferrari red, CSK yellow, ...), fading between teams. */
 @Composable
 fun TeamTheme(color: Color?, content: @Composable () -> Unit) {
     val base = MaterialTheme.colorScheme
-    val target = color ?: base.primary
+    val target = color?.let { legibleAccent(it) } ?: base.primary
     val primary = animateColorAsState(target, tween(450), label = "teamPrimary").value
     val scheme: ColorScheme = base.copy(
         primary = primary,

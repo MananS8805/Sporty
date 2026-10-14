@@ -25,6 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,8 +61,9 @@ fun Crest(url: String?, name: String, modifier: Modifier = Modifier, size: Dp = 
             .then(if (ring != null) Modifier.border(2.dp, ring, CircleShape) else Modifier),
         contentAlignment = Alignment.Center,
     ) {
-        if (url != null) {
-            AsyncImage(url, name, Modifier.fillMaxSize().padding(size * 0.16f), contentScale = ContentScale.Fit)
+        var failed by remember(url) { mutableStateOf(false) }
+        if (url != null && !failed) {
+            AsyncImage(url, name, Modifier.fillMaxSize().padding(size * 0.16f), contentScale = ContentScale.Fit, onError = { failed = true })
         } else {
             Text(initials(name), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         }

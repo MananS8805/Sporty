@@ -178,7 +178,7 @@ private fun StoriesRow(follows: List<FollowedTeam>, live: Set<String>, onOpen: (
 
 @Composable
 private fun StoryAvatar(team: FollowedTeam, live: Boolean, onClick: () -> Unit) {
-    val color = parseHex(team.color) ?: MaterialTheme.colorScheme.primary
+    val color = parseHex(team.color)?.let { legibleAccent(it) } ?: MaterialTheme.colorScheme.primary
     val liveColor = MaterialTheme.extra.live
     val pulse by rememberInfiniteTransition(label = "storyPulse").animateFloat(
         0.35f, 1f, infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "pulse",
@@ -278,7 +278,7 @@ fun HeroCard(hero: Hero, modifier: Modifier = Modifier, onClick: () -> Unit) {
             Spacer(Modifier.height(14.dp))
             Row(verticalAlignment = Alignment.Bottom) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (live) "In play" else "Kicks off in", style = MaterialTheme.typography.labelSmall, color = ink.copy(alpha = 0.75f))
+                    Text(if (live) "In play" else "Starts in", style = MaterialTheme.typography.labelSmall, color = ink.copy(alpha = 0.75f))
                     if (live) Text(f.statusDetail ?: "Live", style = MaterialTheme.typography.displaySmall, color = ink)
                     else Countdown(f.date, style = MaterialTheme.typography.displayMedium, color = ink)
                 }
@@ -347,7 +347,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.timeline(
 
 @Composable
 private fun TimelineItem(fixture: Fixture, team: FollowedTeam?, index: Int, withInsight: Boolean, onOpenMatch: (Fixture, FollowedTeam?) -> Unit) {
-    val accent = parseHex(team?.color) ?: MaterialTheme.colorScheme.primary
+    val accent = parseHex(team?.color)?.let { legibleAccent(it) } ?: MaterialTheme.colorScheme.primary
     val insight = if (withInsight) rememberInsight(fixture) else null
     TimelineCard(fixture, insight, accent, { onOpenMatch(fixture, team) }, Modifier.entrance(index), teamId = team?.teamId)
 }

@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -53,12 +54,19 @@ fun Modifier.shimmer(shape: Shape = RoundedCornerShape(14.dp)): Modifier = compo
     }
 }
 
-/** Fades and slides an item in once when it first appears, staggered by [index]. */
+/**
+ * Fades and slides an item in the first time it appears, staggered by [index]. The "already played" flag is
+ * saveable, so it survives a lazy list disposing and re-creating the item while scrolling (no replay flicker).
+ */
 fun Modifier.entrance(index: Int = 0, offset: Dp = 28.dp): Modifier = composed {
-    val progress = remember { Animatable(0f) }
+    var played by rememberSaveable { mutableStateOf(false) }
+    val progress = remember { Animatable(if (played) 1f else 0f) }
     LaunchedEffect(Unit) {
-        delay(minOf(index, 8) * 55L)
-        progress.animateTo(1f, tween(480, easing = FastOutSlowInEasing))
+        if (!played) {
+            delay(minOf(index, 8) * 55L)
+            progress.animateTo(1f, tween(480, easing = FastOutSlowInEasing))
+            played = true
+        }
     }
     graphicsLayer {
         alpha = progress.value
