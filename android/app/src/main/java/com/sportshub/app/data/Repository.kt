@@ -50,7 +50,7 @@ fun mergeFeed(results: List<Pair<String, Result<TeamOverview>>>): Feed {
     }
     return Feed(
         live = live.values.sortedBy { it.date },
-        upcoming = upcoming.values.sortedBy { it.date }.take(30),
+        upcoming = upcoming.values.sortedBy { it.date }.take(60),
         recent = recent.values.sortedByDescending { it.date }.take(20),
         news = news.values.sortedByDescending { it.published ?: "" }.take(40),
         errors = errors,
