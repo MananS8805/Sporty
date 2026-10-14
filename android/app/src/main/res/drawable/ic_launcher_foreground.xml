@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- A five-point star, kept inside the 66dp adaptive-icon safe zone -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,30 L59.5,46 L76.5,46.2 L62.8,56.3 L68,72.5 L54,62.6 L40,72.5 L45.2,56.3 L31.5,46.2 L48.5,46 Z" />
+</vector>

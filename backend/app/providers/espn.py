@@ -139,6 +139,14 @@ def parse_standings(data: dict) -> list[StandingGroup]:
         rows = []
         for idx, entry in enumerate(node["standings"]["entries"], start=1):
             st = _stat_map(entry)
+            # Cricket names its stats differently; fold them onto the common ones.
+            for cricket, common in (("matchesPlayed", "gamesPlayed"), ("matchesWon", "wins"),
+                                    ("matchesLost", "losses"), ("matchPoints", "points"),
+                                    ("noresult", "ties")):
+                if cricket in st and common not in st:
+                    st[common] = st.pop(cricket)
+            if "netrr" in st:
+                st["netRunRate"] = st.pop("netrr")
             known = {"rank", "gamesPlayed", "wins", "ties", "draws", "losses", "points", "pointDifferential"}
             rows.append(StandingRow(
                 rank=int(st.get("rank", idx)),
@@ -261,10 +269,16 @@ class EspnProvider:
         return await self.cache.get_or_set(f"sb:{league.id}:{rng}", 60, load)
 
     async def team_schedule(self, league: League, team_id: str) -> list[Fixture]:
+        """ESPN returns only played games by default; fixture=true returns the upcoming ones."""
         async def load():
-            data = await get_json(self.client, f"{SITE}/{league.sport}/{league.slug}/teams/{team_id}/schedule")
-            return sorted(filter(None, (parse_event(e, league) for e in data.get("events", []))),
-                          key=lambda f: f.date)
+            url = f"{SITE}/{league.sport}/{league.slug}/teams/{team_id}/schedule"
+            played = await get_json(self.client, url)
+            try:
+                upcoming = await get_json(self.client, url, {"fixture": "true"})
+            except httpx.HTTPError:
+                upcoming = {}  # still show results if the upcoming list fails
+            events = {e.get("id"): e for e in [*played.get("events", []), *upcoming.get("events", [])]}
+            return sorted(filter(None, (parse_event(e, league) for e in events.values())), key=lambda f: f.date)
         return await self.cache.get_or_set(f"sched:{league.id}:{team_id}", 300, load)
 
     async def news(self, league: League, team_id: Optional[str] = None, limit: int = 15) -> list[NewsItem]:

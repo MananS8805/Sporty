@@ -74,6 +74,17 @@ def test_parse_standings_sorted_with_extras():
     assert top.extra == {"netRunRate": 0.5}
 
 
+def test_parse_standings_maps_cricket_stat_names():
+    cricket = {"team": {"id": "1", "displayName": "RCB"}, "stats": [
+        {"name": "matchesPlayed", "value": 14}, {"name": "matchesWon", "value": 9},
+        {"name": "matchesLost", "value": 5}, {"name": "matchPoints", "value": 18},
+        {"name": "netrr", "value": 0.783}]}
+    [group] = parse_standings({"children": [{"name": "IPL", "standings": {"entries": [cricket]}}]})
+    row = group.rows[0]
+    assert (row.played, row.wins, row.losses, row.points) == (14, 9, 5, 18)
+    assert row.extra == {"netRunRate": 0.783}
+
+
 def test_parse_standings_nested_conferences():
     data = {"children": [{"name": "East", "children": [{"name": "Atlantic", "standings": {"entries": [entry("1", "A", 1, 3)]}}]},
                          {"name": "West", "standings": {"entries": [entry("2", "B", 1, 3)]}}]}
