@@ -192,7 +192,8 @@ private fun TeamHero(
     onOpenLeague: () -> Unit,
 ) {
     val team = page.overview.team
-    val color = MaterialTheme.colorScheme.primary
+    // The hero keeps the true brand colour; only text and small accents use the lightened, legible variant.
+    val color = parseHex(team.color) ?: MaterialTheme.colorScheme.primary
     val ink = onColor(color)
     val background = Brush.verticalGradient(listOf(color, lerp(color, Color.Black, 0.6f)))
     Box(Modifier.fillMaxWidth().background(background)) {
