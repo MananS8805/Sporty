@@ -57,11 +57,22 @@ object National {
         !EXCLUDED_SERIES.containsMatchIn(text) && Regex("\\b${Regex.escape(teamName)}\\b", RegexOption.IGNORE_CASE).containsMatchIn(text)
 }
 
-class NationalProvider(private val espn: EspnProvider, private val cache: TtlCache) {
+class NationalProvider(private val espn: EspnProvider, private val cache: TtlCache, private val disk: DiskCache? = null) {
+    private companion object {
+        const val DAY = 24 * 60 * 60_000L
+    }
+
+    private suspend fun persisted(key: String, maxAgeMs: Long, compute: suspend () -> String): String =
+        disk?.get(key, maxAgeMs) ?: compute().also { disk?.put(key, it) }
+
     suspend fun footballTeams(): List<Team> =
         espn.teams(National.footballLeague("fifa.friendly")).map { it.copy(leagueId = National.FOOTBALL.id) }
 
-    private suspend fun confederationSlugs(teamId: String): List<String> = cache.getOrSet("nat:conf:$teamId", 24 * 60 * 60_000L) {
+    private suspend fun confederationSlugs(teamId: String): List<String> = cache.getOrSet("nat:conf:$teamId", DAY) {
+        persisted("conf:$teamId", 7 * DAY) { findConfederation(teamId).joinToString(",") }.split(',').filter { it.isNotEmpty() }
+    }
+
+    private suspend fun findConfederation(teamId: String): List<String> {
         for ((qualifier, extra) in National.CONFEDERATIONS) {
             val members = try {
                 espn.teams(National.footballLeague(qualifier))
@@ -72,9 +83,9 @@ class NationalProvider(private val espn: EspnProvider, private val cache: TtlCac
             } catch (e: Exception) {
                 continue // an inactive qualifier cycle can 404; try the next confederation
             }
-            if (members.any { it.id == teamId }) return@getOrSet listOf(qualifier) + extra
+            if (members.any { it.id == teamId }) return listOf(qualifier) + extra
         }
-        emptyList()
+        return emptyList()
     }
 
     suspend fun footballFixtures(teamId: String): List<Fixture> {
@@ -100,6 +111,28 @@ class NationalProvider(private val espn: EspnProvider, private val cache: TtlCac
     suspend fun cricketFixtures(teamId: String): List<Fixture> {
         val team = National.cricketTeams.firstOrNull { it.id == teamId } ?: return emptyList()
         val today = LocalDate.now(ZoneOffset.UTC)
+        val series = persisted("series:$teamId", 6 * 60 * 60_000L) {
+            discoverSeries(team, today).joinToString("\n") { "${it.id}\t${it.name}" }
+        }.lines().filter { it.isNotBlank() }.map { line -> line.split('\t', limit = 2).let { CricketSeries(it[0], it.getOrElse(1) { "" }, emptyList()) } }
+        val fixtures = mutableListOf<Fixture>()
+        for (s in series) {
+            val league = League("cricket:${s.id}", "cricket", s.id, s.name)
+            for (year in listOf(today.year, today.year + 1)) {
+                try {
+                    fixtures += espn.seasonEvents(league, year).filter { f -> f.home?.id == teamId || f.away?.id == teamId }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: UpstreamBlocked) {
+                    throw e
+                } catch (e: Exception) {
+                    continue
+                }
+            }
+        }
+        return fixtures.distinctBy { it.id }.sortedBy { it.date }
+    }
+
+    private suspend fun discoverSeries(team: Team, today: LocalDate): List<CricketSeries> {
         // Tours are short, so sample every 5 days for ~3 months; the header feed only lists series active on a date.
         val sampled = coroutineScope {
             (0L..90L step 5).map { offset ->
@@ -120,21 +153,6 @@ class NationalProvider(private val espn: EspnProvider, private val cache: TtlCac
         for (s in sampled.flatten()) {
             if (National.seriesMentions(s.name, team.name) || s.eventNames.any { National.seriesMentions(it, team.name) }) series.putIfAbsent(s.id, s)
         }
-        val fixtures = mutableListOf<Fixture>()
-        for (s in series.values) {
-            val league = League("cricket:${s.id}", "cricket", s.id, s.name)
-            for (year in listOf(today.year, today.year + 1)) {
-                try {
-                    fixtures += espn.seasonEvents(league, year).filter { f -> f.home?.id == teamId || f.away?.id == teamId }
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: UpstreamBlocked) {
-                    throw e
-                } catch (e: Exception) {
-                    continue
-                }
-            }
-        }
-        return fixtures.distinctBy { it.id }.sortedBy { it.date }
+        return series.values.toList()
     }
 }

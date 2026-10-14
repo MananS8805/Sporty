@@ -103,12 +103,17 @@ fun sortPlayers(players: List<Player>): List<Player> = players.sortedWith(
 )
 
 /** Everything the UI needs. Routes each league to the right data source, all from the phone. */
-class Repository(private val context: Context, val follows: FollowStore, gate: HttpGate = HttpGate()) {
+class Repository(
+    private val context: Context,
+    val follows: FollowStore,
+    gate: HttpGate = HttpGate(),
+    disk: DiskCache = DiskCache(context),
+) {
     private val cache = TtlCache()
     private val espn = EspnProvider(gate, cache)
     private val f1 = F1Provider(gate, cache)
     private val tsdb = TsdbProvider(gate, cache)
-    private val national = NationalProvider(espn, cache)
+    private val national = NationalProvider(espn, cache, disk)
 
     // The league list ships inside the app (assets/leagues.json), so no discovery requests are needed.
     private val leagueList: List<League> by lazy {
@@ -170,6 +175,9 @@ class Repository(private val context: Context, val follows: FollowStore, gate: H
         teamId != null -> espn.teamSchedule(league, teamId)
         else -> espn.scoreboard(league)
     }
+
+    /** A team's full fixture list (used by background checks as well as the UI). */
+    suspend fun fixtures(leagueId: String, teamId: String): List<Fixture> = fixtures(requireLeague(leagueId), teamId)
 
     private suspend fun news(league: League, teamId: String?, limit: Int): List<NewsItem> {
         when {
